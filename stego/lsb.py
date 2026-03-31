@@ -69,9 +69,8 @@ def _embed_bits_in_frame(frame, bits, offset, scheme, use_random, stego_key, fra
     return stego, idx
 
 
-def _extract_bits_from_frame(frame, n_bits, offset, scheme, use_random, stego_key, frame_idx):
+def _extract_bits_from_frame(frame, n_bits, scheme, use_random, stego_key, frame_idx):
     r_bits, g_bits, b_bits = parse_scheme(scheme)
-    bpp = r_bits + g_bits + b_bits
     h, w = frame.shape[:2]
     order = _get_pixel_order(w, h, use_random, stego_key, frame_idx)
 
@@ -200,7 +199,7 @@ def extract(stego_path, a51_key=None, stego_key=None):
     for try_scheme in SCHEMES:
         try:
             hdr_bits = _extract_bits_from_frame(
-                frames[0], PROBE_BITS, 0, try_scheme, False, None, 0)
+                frames[0], PROBE_BITS, try_scheme, False, None, 0)
             info = unpack_header_from_bits(hdr_bits)
             if info['scheme'] == try_scheme:
                 header_info = info
@@ -213,7 +212,7 @@ def extract(stego_path, a51_key=None, stego_key=None):
         for try_scheme in SCHEMES:
             try:
                 hdr_bits = _extract_bits_from_frame(
-                    frames[0], PROBE_BITS, 0, try_scheme, True, stego_key, 0)
+                    frames[0], PROBE_BITS, try_scheme, True, stego_key, 0)
                 info = unpack_header_from_bits(hdr_bits)
                 if info['scheme'] == try_scheme:
                     header_info = info
@@ -240,7 +239,7 @@ def extract(stego_path, a51_key=None, stego_key=None):
         frame_capacity = frame.shape[0] * frame.shape[1] * bpp
         n = min(bits_remaining, frame_capacity)
         frame_bits = _extract_bits_from_frame(
-            frame, n, 0, scheme, use_random, stego_key if use_random else None, fi)
+            frame, n, scheme, use_random, stego_key if use_random else None, fi)
         all_extracted.extend(frame_bits)
         bits_remaining -= len(frame_bits)
 
