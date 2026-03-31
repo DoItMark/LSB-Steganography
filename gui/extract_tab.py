@@ -1,8 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
+import os
 
 from stego.lsb import extract
+from stego.utils import sha256_digest
+
 
 class ExtractTab(ttk.Frame):
     def __init__(self, parent):
@@ -10,6 +13,10 @@ class ExtractTab(ttk.Frame):
         self.stego_path = tk.StringVar()
         self.a51_key = tk.StringVar()
         self.stego_key = tk.StringVar()
+
+        self._extracted_data = None
+        self._extracted_filename = None
+        self._extracted_hash = None
 
         self._build_ui()
 
@@ -38,26 +45,33 @@ class ExtractTab(ttk.Frame):
         ttk.Label(self, textvariable=self.status_var, foreground='gray').grid(
             row=row, column=0, columnspan=3, sticky='w', **pad)
 
-        # Result area
         row += 1
         ttk.Label(self, text="Extracted Message:").grid(row=row, column=0, sticky='nw', **pad)
 
         row += 1
-        self.result_text = tk.Text(self, height=12, width=60, state='disabled')
+        self.result_text = tk.Text(self, height=10, width=60, state='disabled')
         self.result_text.grid(row=row, column=0, columnspan=2, sticky='nsew', **pad)
         scrollbar = ttk.Scrollbar(self, command=self.result_text.yview)
         scrollbar.grid(row=row, column=2, sticky='ns')
         self.result_text.config(yscrollcommand=scrollbar.set)
 
         row += 1
-        self.save_btn = ttk.Button(self, text="Save Extracted File", command=self._save_file, state='disabled')
-        self.save_btn.grid(row=row, column=0, columnspan=3, pady=6)
+        self.hash_var = tk.StringVar()
+        ttk.Label(self, textvariable=self.hash_var, font=('Consolas', 9),
+                  foreground='gray').grid(row=row, column=0, columnspan=3, sticky='w', **pad)
+
+        row += 1
+        btn_frame = ttk.Frame(self)
+        btn_frame.grid(row=row, column=0, columnspan=3, pady=6)
+        self.save_btn = ttk.Button(btn_frame, text="Save Extracted File",
+                                   command=self._save_file, state='disabled')
+        self.save_btn.pack(side='left', padx=8)
+        self.verify_btn = ttk.Button(btn_frame, text="Verify Integrity",
+                                     command=self._verify_integrity, state='disabled')
+        self.verify_btn.pack(side='left', padx=8)
 
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(row - 1, weight=1)
-
-        self._extracted_data = None
-        self._extracted_filename = None
+        self.rowconfigure(row - 2, weight=1)
 
     def _browse_stego(self):
         path = filedialog.askopenfilename(
@@ -76,6 +90,7 @@ class ExtractTab(ttk.Frame):
 
         self.extract_btn.config(state='disabled')
         self.status_var.set("Extracting...")
+        self.hash_var.set("")
 
         def _do():
             try:
@@ -91,19 +106,26 @@ class ExtractTab(ttk.Frame):
         self.extract_btn.config(state='normal')
         self.status_var.set("Extraction complete!")
 
+        self._extracted_data = data
+        self._extracted_filename = filename
+        self._extracted_hash = sha256_digest(data)
+        self.hash_var.set(f"SHA-256: {self._extracted_hash}")
+        self.verify_btn.config(state='normal')
+
         if is_file:
-            self._extracted_data = data
-            self._extracted_filename = filename
             self.save_btn.config(state='normal')
             self.result_text.config(state='normal')
             self.result_text.delete('1.0', 'end')
-            self.result_text.insert('1.0', f"[File extracted: {filename}]\nSize: {len(data):,} bytes\n\nClick 'Save Extracted File' to save.")
+            self.result_text.insert('1.0',
+                f"[File extracted: {filename}]\nSize: {len(data):,} bytes\n\n"
+                "Click 'Save Extracted File' to save.\n"
+                "Click 'Verify Integrity' to compare against the original file.")
             self.result_text.config(state='disabled')
         else:
             self.save_btn.config(state='disabled')
             try:
                 text = data.decode('utf-8')
-            except:
+            except Exception:
                 text = data.decode('latin-1')
             self.result_text.config(state='normal')
             self.result_text.delete('1.0', 'end')
@@ -124,3 +146,21 @@ class ExtractTab(ttk.Frame):
             with open(path, 'wb') as f:
                 f.write(self._extracted_data)
             messagebox.showinfo("Saved", f"File saved to {path}")
+
+    def _verify_integrity(self):
+        if self._extracted_hash is None:
+            return
+        path = filedialog.askopenfilename(title="Select original file to compare")
+        if not path:
+            return
+        with open(path, 'rb') as f:
+            original_hash = sha256_digest(f.read())
+        if original_hash == self._extracted_hash:
+            messagebox.showinfo(
+                "Integrity OK",
+                f"SHA-256 match: payload is intact.\n\n{self._extracted_hash}")
+        else:
+            messagebox.showerror(
+                "Integrity FAIL",
+                f"SHA-256 mismatch: payload may be corrupted.\n\n"
+                f"Original:  {original_hash}\nExtracted: {self._extracted_hash}")

@@ -224,7 +224,6 @@ def extract(stego_path, a51_key=None, stego_key=None):
 
     SCHEMES = ["3-3-2", "4-2-2", "2-3-3"]
     header_info = None
-    working_scheme = None
     PROBE_BITS = 2048
 
     for try_scheme in SCHEMES:
@@ -234,7 +233,6 @@ def extract(stego_path, a51_key=None, stego_key=None):
             info = unpack_header_from_bits(hdr_bits)
             if info['scheme'] == try_scheme:
                 header_info = info
-                working_scheme = try_scheme
                 break
         except:
             continue
@@ -247,7 +245,6 @@ def extract(stego_path, a51_key=None, stego_key=None):
                 info = unpack_header_from_bits(hdr_bits)
                 if info['scheme'] == try_scheme:
                     header_info = info
-                    working_scheme = try_scheme
                     break
             except:
                 continue
@@ -285,18 +282,4 @@ def extract(stego_path, a51_key=None, stego_key=None):
         payload_raw = a51_decrypt(payload_raw, a51_key)
 
     return payload_raw, hdr['is_file'], hdr['filename']
-
-
-def get_frames(video_path, frame_indices=None):
-    cap = cv2.VideoCapture(video_path)
-    frames = {}
-    idx = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if frame_indices is None or idx in frame_indices:
-            frames[idx] = frame
-        idx += 1
-    cap.release()
-    return frames
+

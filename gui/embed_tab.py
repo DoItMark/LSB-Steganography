@@ -4,6 +4,7 @@ import threading
 import os
 
 from stego.lsb import embed, get_capacity
+from stego.utils import sha256_digest
 from gui.histogram_window import HistogramWindow
 
 class EmbedTab(ttk.Frame):
@@ -23,6 +24,7 @@ class EmbedTab(ttk.Frame):
         self._out_path = None
         self._last_mse = None
         self._last_psnr = None
+        self._last_payload_hash = None
 
         self._build_ui()
 
@@ -265,26 +267,26 @@ class EmbedTab(ttk.Frame):
 
                 self._last_mse = avg_mse
                 self._last_psnr = avg_psnr
+                self._last_payload_hash = sha256_digest(payload)
 
-                self.after(0, lambda: self._embed_done(avg_mse, avg_psnr))
+                self.after(0, lambda: self._embed_done(avg_mse, avg_psnr, self._last_payload_hash))
             except Exception as e:
                 err_msg = str(e)
                 self.after(0, lambda msg=err_msg: self._embed_error(msg))
 
         threading.Thread(target=_do, daemon=True).start()
 
-    def _embed_done(self, mse, psnr):
+    def _embed_done(self, mse, psnr, payload_hash):
         self.embed_btn.config(state='normal')
         self.hist_btn.config(state='normal')
         self.progress['value'] = 100
         self.status_var.set("Embedding complete!")
         if mse == 0.0 and psnr == float('inf'):
-            self.result_var.set(
-                "MSE: 0.0  |  PSNR: ∞ dB  "
-                "(MP4 container mode (frames unmodified))")
+            quality = "MSE: 0.0  |  PSNR: ∞ dB  (MP4 container mode (frames unmodified))"
         else:
             psnr_str = f"{psnr:.2f}" if psnr != float('inf') else "∞"
-            self.result_var.set(f"Avg MSE: {mse:.4f}  |  Avg PSNR: {psnr_str} dB")
+            quality = f"Avg MSE: {mse:.4f}  |  Avg PSNR: {psnr_str} dB"
+        self.result_var.set(f"{quality}\nSHA-256: {payload_hash}")
 
     def _embed_error(self, msg):
         self.embed_btn.config(state='normal')

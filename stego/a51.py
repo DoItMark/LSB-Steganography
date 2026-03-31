@@ -1,3 +1,5 @@
+from stego.utils import bytes_to_bits, bits_to_bytes
+
 BLOCK_BITS = 228
 
 # LFSR sizes
@@ -98,30 +100,17 @@ def _key_to_bits(key_str):
 
 def encrypt(plaintext_bytes, key_str):
     kc_bits = _key_to_bits(key_str)
-    plain_bits = []
-    for b in plaintext_bytes:
-        for i in range(8):
-            plain_bits.append((b >> (7 - i)) & 1)
+    plain_bits = bytes_to_bits(plaintext_bytes)
 
     cipher_bits = []
     fn = 0
     for offset in range(0, len(plain_bits), BLOCK_BITS):
         chunk = plain_bits[offset:offset + BLOCK_BITS]
         ks = _generate_keystream(kc_bits, fn, len(chunk))
-        for j in range(len(chunk)):
-            cipher_bits.append(chunk[j] ^ ks[j])
+        cipher_bits.extend(chunk[j] ^ ks[j] for j in range(len(chunk)))
         fn += 1
 
-    out = bytearray()
-    for i in range(0, len(cipher_bits), 8):
-        byte_bits = cipher_bits[i:i+8]
-        if len(byte_bits) < 8:
-            byte_bits += [0] * (8 - len(byte_bits))
-        val = 0
-        for bit in byte_bits:
-            val = (val << 1) | bit
-        out.append(val)
-    return bytes(out)
+    return bits_to_bytes(cipher_bits)
 
 
 def decrypt(ciphertext_bytes, key_str):
